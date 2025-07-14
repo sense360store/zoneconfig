@@ -1,0 +1,68 @@
+{
+  "name": "Sense360 ESP32 Firmware",
+  "version": "1.0.0",
+  "home_assistant_domain": "esphome",
+  "new_install_skip_erase": false,
+  "builds": [
+    {
+      "device_type": "CO2Monitor",
+      "version": "1.0.0",
+      "channel": "stable",
+      "chipFamily": "ESP32-S3",
+      "parts": [
+        {
+          "path": "firmware/CO2Monitor/ESP32S3/stable/Sense360-CO2Monitor-ESP32S3-v1.0.0-stable.bin",
+          "offset": 0
+        }
+      ],
+      "build_date": "2025-07-13T13:54:57Z",
+      "file_size": 26,
+      "improv": true
+    },
+    {
+      "device_type": "CO2Monitor",
+      "version": "1.0.1",
+      "channel": "stable",
+      "chipFamily": "ESP32-S3",
+      "parts": [
+        {
+          "path": "firmware/CO2Monitor/ESP32S3/stable/Sense360-CO2Monitor-ESP32S3-v1.0.1-stable.bin",
+          "offset": 0
+        }
+      ],
+      "build_date": "2025-07-13T14:25:36Z",
+      "file_size": 30,
+      "improv": true
+    },
+    {
+      "device_type": "EnvMonitor",
+      "version": "2.1.0",
+      "channel": "stable",
+      "chipFamily": "ESP32",
+      "parts": [
+        {
+          "path": "firmware/EnvMonitor/ESP32/stable/Sense360-EnvMonitor-ESP32-v2.1.0-stable.bin",
+          "offset": 0
+        }
+      ],
+      "build_date": "2025-07-13T14:25:36Z",
+      "file_size": 43,
+      "improv": true
+    },
+    {
+      "device_type": "EnvMonitor",
+      "version": "2.2.0",
+      "channel": "beta",
+      "chipFamily": "ESP32",
+      "parts": [
+        {
+          "path": "firmware/EnvMonitor/ESP32/beta/Sense360-EnvMonitor-ESP32-v2.2.0-beta.bin",
+          "offset": 0
+        }
+      ],
+      "build_date": "2025-07-13T14:25:36Z",
+      "file_size": 22,
+      "improv": true
+    }
+  ]
+}

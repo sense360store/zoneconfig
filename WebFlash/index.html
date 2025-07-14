@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sense360 ESP32 Firmware Installer</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script type="module" src="https://unpkg.com/esp-web-tools@9/dist/web/install-button.js"></script>
+    <script>
+        let globalManifest = null;
+        let selectedFirmware = null;
+        
+        // Load and display firmware information from manifest.json
+        async function loadFirmwareInfo() {
+            try {
+                const response = await fetch('manifest.json');
+                const manifest = await response.json();
+                globalManifest = manifest;
+                
+                console.log('Loaded manifest:', manifest);
+                
+                const firmwareDetails = document.getElementById('firmware-details');
+                
+                if (manifest.builds && manifest.builds.length > 0) {
+                    // Create simple firmware list
+                    let html = '<div class="firmware-list">';
+                    
+                    manifest.builds.forEach((build, index) => {
+                        const deviceType = build.device_type || 'Unknown';
+                        const chipFamily = build.chipFamily || 'Unknown';
+                        const version = build.version || '1.0.0';
+                        const channel = build.channel || 'stable';
+                        const buildDate = build.build_date ? new Date(build.build_date).toLocaleDateString() : 'Unknown';
+                        
+                        html += `<div class="build-item" data-firmware-index="${index}" data-device-type="${deviceType}" data-chip-family="${chipFamily}" data-version="${version}" data-channel="${channel}" onclick="selectFirmware(${index})">
+                            <div class="build-info">
+                                <span class="build-name">${deviceType} v${version}</span>
+                                <span class="build-chip">${chipFamily}</span>
+                                <span class="build-channel ${channel}">${channel}</span>
+                                <span class="build-date">${buildDate}</span>
+                            </div>
+                        </div>`;
+                    });
+                    
+                    html += '</div>';
+                    
+                    // Add summary
+                    const chipFamilies = [...new Set(manifest.builds.map(build => build.chipFamily))];
+                    const summary = `<div class="firmware-summary">
+                        <p><strong>${manifest.builds.length} firmware builds</strong> available for <strong>${chipFamilies.join(', ')}</strong> devices</p>
+                    </div>`;
+                    
+                    firmwareDetails.innerHTML = summary + html;
+                    
+                    // Populate device type filter
+                    populateDeviceTypeFilter();
+                } else {
+                    firmwareDetails.innerHTML = '<p>No firmware builds found in manifest.</p>';
+                }
+            } catch (error) {
+                console.error('Error loading firmware info:', error);
+                document.getElementById('firmware-details').innerHTML = 
+                    '<p>Error loading firmware information. Please check the console for details.</p>';
+            }
+        }
+        
+        // Select firmware and update install button
+        function selectFirmware(index) {
+            const build = globalManifest.builds[index];
+            selectedFirmware = build;
+            
+            // Update visual selection
+            document.querySelectorAll('.build-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            document.querySelector(`[data-firmware-index="${index}"]`).classList.add('selected');
+            
+            // Update install button
+            const installButton = document.querySelector('#main-installer button[slot="activate"]');
+            installButton.disabled = false;
+            installButton.textContent = `Install ${build.device_type} v${build.version} (${build.chipFamily})`;
+            
+            // Create individual manifest for selected firmware
+            createIndividualManifest(build, index);
+        }
+        
+        // Create individual manifest for selected firmware
+        function createIndividualManifest(build, index) {
+            // Use the pre-generated individual manifest files
+            const manifestFilename = `firmware-${index}.json`;
+            
+            console.log('Using individual manifest:', manifestFilename);
+            console.log('Selected firmware:', build.device_type, 'v' + build.version, build.chipFamily);
+            
+            // Update the ESP Web Tools manifest attribute
+            const installer = document.getElementById('main-installer');
+            installer.setAttribute('manifest', manifestFilename);
+            
+            console.log('Manifest URL updated to:', manifestFilename);
+        }
+        
+        // Populate device type filter dropdown
+        function populateDeviceTypeFilter() {
+            if (!globalManifest || !globalManifest.builds) return;
+            
+            const deviceTypes = [...new Set(globalManifest.builds.map(build => build.device_type))];
+            const select = document.getElementById('device-filter');
+            
+            // Clear existing options except "All Devices"
+            select.innerHTML = '<option value="">All Devices</option>';
+            
+            deviceTypes.forEach(deviceType => {
+                const option = document.createElement('option');
+                option.value = deviceType;
+                option.textContent = deviceType;
+                select.appendChild(option);
+            });
+        }
+        
+        // Filter firmware based on device type and search
+        function filterFirmware() {
+            const deviceFilter = document.getElementById('device-filter').value;
+            const searchInput = document.getElementById('search-input').value.toLowerCase();
+            const buildItems = document.querySelectorAll('.build-item');
+            
+            let visibleCount = 0;
+            
+            buildItems.forEach(item => {
+                const deviceType = item.getAttribute('data-device-type');
+                const chipFamily = item.getAttribute('data-chip-family');
+                const version = item.getAttribute('data-version');
+                const channel = item.getAttribute('data-channel');
+                
+                // Check device type filter
+                const matchesDeviceType = !deviceFilter || deviceType === deviceFilter;
+                
+                // Check search input
+                const searchText = `${deviceType} ${chipFamily} ${version} ${channel}`.toLowerCase();
+                const matchesSearch = !searchInput || searchText.includes(searchInput);
+                
+                if (matchesDeviceType && matchesSearch) {
+                    item.style.display = 'block';
+                    visibleCount++;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+            
+            // Update summary
+            const summary = document.querySelector('.firmware-summary p');
+            if (summary) {
+                const totalBuilds = globalManifest.builds.length;
+                const filterText = visibleCount === totalBuilds ? 
+                    `${totalBuilds} firmware builds` : 
+                    `${visibleCount} of ${totalBuilds} firmware builds`;
+                
+                const chipFamilies = [...new Set(globalManifest.builds.map(build => build.chipFamily))];
+                summary.innerHTML = `<strong>${filterText}</strong> available for <strong>${chipFamilies.join(', ')}</strong> devices`;
+            }
+        }
+        
+        // Load firmware info when page loads
+        document.addEventListener('DOMContentLoaded', loadFirmwareInfo);
+    </script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-container">
+                <img src="sense360-logo.png" alt="Sense360 Logo" class="logo">
+                <div class="header-text">
+                    <h1>Sense360 ESP32 Firmware Installer</h1>
+                    <p class="subtitle">Flash firmware to your ESP32 devices using your web browser</p>
+                </div>
+            </div>
+        </header>
+
+        <div class="browser-check">
+            <div class="browser-warning" id="browser-warning" style="display: none;">
+                <h3>⚠️ Browser Not Supported</h3>
+                <p>This installer requires Chrome or Edge browser with Web Serial API support.</p>
+                <p>Please use Chrome or Edge to continue.</p>
+            </div>
+        </div>
+
+        <div class="firmware-info" id="firmware-info">
+            <h2>Available Firmware</h2>
+            
+            <!-- Device Type Filter -->
+            <div class="filter-section">
+                <div class="filter-controls">
+                    <label for="device-filter">Filter by Device Type:</label>
+                    <select id="device-filter" onchange="filterFirmware()">
+                        <option value="">All Devices</option>
+                    </select>
+                </div>
+                <div class="search-controls">
+                    <label for="search-input">Search:</label>
+                    <input type="text" id="search-input" placeholder="Search firmware..." onkeyup="filterFirmware()">
+                </div>
+            </div>
+            
+            <div class="firmware-details" id="firmware-details">
+                <p>Loading firmware information...</p>
+            </div>
+        </div>
+
+        <div class="installation-section" id="installation-section">
+            <div class="install-button-container">
+                <esp-web-install-button id="main-installer" manifest="manifest.json">
+                    <button slot="activate" class="install-button" disabled>
+                        Select Firmware to Install
+                    </button>
+                    <span slot="unsupported">
+                        <div class="unsupported-message">
+                            <h3>Web Serial API Not Supported</h3>
+                            <p>Your browser doesn't support Web Serial API. Please use Chrome or Edge.</p>
+                        </div>
+                    </span>
+                    <span slot="not-allowed">
+                        <div class="not-allowed-message">
+                            <h3>Connection Not Allowed</h3>
+                            <p>Web Serial API access was denied. Please refresh and try again.</p>
+                        </div>
+                    </span>
+                </esp-web-install-button>
+            </div>
+
+            <div class="installation-steps">
+                <h3>Installation Steps</h3>
+                <ol>
+                    <li>Connect your ESP32 device to your computer via USB</li>
+                    <li>Select the firmware you want to install from the list above</li>
+                    <li>Click "Install Selected Firmware" when ready</li>
+                    <li>Select your device from the popup and wait for completion</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="features-section">
+            <h2>Firmware Features</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <h4>Environmental Monitoring</h4>
+                    <p>Temperature, humidity, air quality, and environmental sensors</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Multi-Chip Support</h4>
+                    <p>Compatible with ESP32, ESP32-S2, ESP32-S3, and ESP32-C3 devices</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Easy Installation</h4>
+                    <p>Browser-based flashing with automatic device detection</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Regular Updates</h4>
+                    <p>Latest firmware versions with new features and bug fixes</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="troubleshooting-section">
+            <h2>Troubleshooting</h2>
+            <div class="troubleshooting-grid">
+                <div class="troubleshooting-item">
+                    <h3>No Firmware Available</h3>
+                    <p>No firmware is currently available for installation. Please check back later.</p>
+                </div>
+                <div class="troubleshooting-item">
+                    <h3>Device Not Detected</h3>
+                    <p>Make sure your device is connected via USB and the correct drivers are installed.</p>
+                </div>
+                <div class="troubleshooting-item">
+                    <h3>Installation Failed</h3>
+                    <p>Try putting your device in download mode by holding the BOOT button while connecting.</p>
+                </div>
+                <div class="troubleshooting-item">
+                    <h3>Connection Issues</h3>
+                    <p>Ensure no other programs are using the serial port. Close Arduino IDE or other serial monitors.</p>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>&copy; 2025 Sense360. Built with ESP Web Tools and Firmware Lifecycle Management.</p>
+        </footer>
+    </div>
+
+    <script>
+        // Check browser compatibility
+        if (!navigator.serial) {
+            document.getElementById('browser-warning').style.display = 'block';
+            document.getElementById('firmware-info').style.display = 'none';
+            document.getElementById('installation-section').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

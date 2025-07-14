@@ -1,0 +1,18 @@
+{
+  "name": "Sense360 ESP32 Firmware - CO2Monitor",
+  "version": "1.0.0",
+  "home_assistant_domain": "esphome",
+  "new_install_skip_erase": false,
+  "builds": [
+    {
+      "chipFamily": "ESP32-S3",
+      "parts": [
+        {
+          "path": "firmware/CO2Monitor/ESP32S3/stable/Sense360-CO2Monitor-ESP32S3-v1.0.0-stable.bin",
+          "offset": 0
+        }
+      ],
+      "improv": true
+    }
+  ]
+}

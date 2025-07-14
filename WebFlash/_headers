@@ -1,0 +1,18 @@
+# CORS headers for GitHub Pages
+# These headers ensure ESP Web Tools can access firmware files and manifests
+
+/*
+  Access-Control-Allow-Origin: *
+  Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
+  Access-Control-Allow-Headers: Content-Type, Authorization
+
+# Specific headers for manifest files
+*.json
+  Content-Type: application/json
+  Access-Control-Allow-Origin: *
+
+# Specific headers for firmware binaries
+*.bin
+  Content-Type: application/octet-stream
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=31536000
