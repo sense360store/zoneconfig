@@ -1,10 +1,3 @@
-#!/usr/bin/with-contenv bashio
+#!/command/with-contenv bashio
 
-# Start nginx
-bashio::log.info "Starting nginx..."
-exec nginx -g "daemon off;" &
-
-# Start Python backend
-bashio::log.info "Starting Sense 360 Zone Configurator backend..."
-cd /
-exec python3 backend.py
+exec python3 /app/backend.py
