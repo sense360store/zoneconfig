@@ -23,9 +23,6 @@ SUPERVISOR_TOKEN = os.getenv('SUPERVISOR_TOKEN')
 HA_URL = os.getenv('HA_URL')
 HA_TOKEN = os.getenv('HA_TOKEN')
 
-# Check if we're in demo mode (no HA credentials)
-DEMO_MODE = not (SUPERVISOR_TOKEN or (HA_URL and HA_TOKEN))
-
 if SUPERVISOR_TOKEN:
     HOME_ASSISTANT_API = 'http://supervisor/core/api'
     headers = {
@@ -38,16 +35,9 @@ elif HA_URL and HA_TOKEN:
         'Authorization': f'Bearer {HA_TOKEN}',
         'Content-Type': 'application/json',
     }
-elif DEMO_MODE:
-    # Demo mode - use placeholder values
-    HOME_ASSISTANT_API = 'demo://home-assistant'
-    headers = {
-        'Authorization': 'Bearer demo-token',
-        'Content-Type': 'application/json',
-    }
-    logging.info('Running in DEMO MODE - Home Assistant API calls will be simulated')
 else:
     logging.error('No SUPERVISOR_TOKEN found and no HA_URL and HA_TOKEN provided.')
+    logging.error('This application requires Home Assistant API credentials to function.')
     sys.exit(1)
 
 def check_connectivity():
@@ -60,58 +50,7 @@ def check_connectivity():
     except requests.exceptions.RequestException as e:
         logging.error(f"Exception connecting to Home Assistant API: {e}")
 
-def generate_demo_entity(entity_id):
-    """Generate demo entity data for demo mode"""
-    import random
-    import datetime
-    
-    base_name = entity_id.split('_')[0] + '_' + entity_id.split('_')[1] + '_' + entity_id.split('_')[2]
-    
-    # Base entity structure
-    entity = {
-        "entity_id": entity_id,
-        "last_changed": datetime.datetime.now().isoformat(),
-        "last_updated": datetime.datetime.now().isoformat(),
-        "context": {"id": "demo", "parent_id": None, "user_id": None},
-        "attributes": {
-            "friendly_name": entity_id.replace('_', ' ').title()
-        }
-    }
-    
-    # Generate appropriate state based on entity type
-    if 'zone_' in entity_id and '_begin_x' in entity_id:
-        entity["state"] = str(random.randint(-2000, 2000))
-        entity["attributes"]["unit_of_measurement"] = "mm"
-    elif 'zone_' in entity_id and '_begin_y' in entity_id:
-        entity["state"] = str(random.randint(0, 4000))
-        entity["attributes"]["unit_of_measurement"] = "mm"
-    elif 'zone_' in entity_id and '_end_x' in entity_id:
-        entity["state"] = str(random.randint(-2000, 2000))
-        entity["attributes"]["unit_of_measurement"] = "mm"
-    elif 'zone_' in entity_id and '_end_y' in entity_id:
-        entity["state"] = str(random.randint(1000, 6000))
-        entity["attributes"]["unit_of_measurement"] = "mm"
-    elif 'target_' in entity_id and '_x' in entity_id:
-        entity["state"] = str(random.randint(-1500, 1500))
-        entity["attributes"]["unit_of_measurement"] = "mm"
-    elif 'target_' in entity_id and '_y' in entity_id:
-        entity["state"] = str(random.randint(500, 3000))
-        entity["attributes"]["unit_of_measurement"] = "mm"
-    elif 'target_' in entity_id and '_active' in entity_id:
-        entity["state"] = "on" if random.random() > 0.7 else "off"
-    elif 'off_delay' in entity_id:
-        entity["state"] = str(random.randint(3, 10))
-        entity["attributes"]["unit_of_measurement"] = "s"
-    elif 'max_distance' in entity_id:
-        entity["state"] = "6000"
-        entity["attributes"]["unit_of_measurement"] = "mm"
-    elif 'installation_angle' in entity_id:
-        entity["state"] = "0"
-        entity["attributes"]["unit_of_measurement"] = "°"
-    else:
-        entity["state"] = "unknown"
-    
-    return entity
+
 
 # Serve the main HTML file
 @app.route('/')
@@ -124,23 +63,9 @@ def health_check():
     """Health check endpoint to test HA connectivity"""
     try:
         logging.debug("🩺 Health check requested")
-        
-        if DEMO_MODE:
-            return jsonify({
-                "backend_status": "running",
-                "demo_mode": True,
-                "ha_api_url": f"{HOME_ASSISTANT_API}/",
-                "ha_response_status": 200,
-                "ha_response_type": "application/json",
-                "supervisor_token_available": bool(SUPERVISOR_TOKEN),
-                "ha_url_override": bool(HA_URL),
-                "ha_token_override": bool(HA_TOKEN)
-            })
-        
         response = requests.get(f'{HOME_ASSISTANT_API}/', headers=headers, timeout=5)
         return jsonify({
             "backend_status": "running",
-            "demo_mode": False,
             "ha_api_url": f"{HOME_ASSISTANT_API}/",
             "ha_response_status": response.status_code,
             "ha_response_type": response.headers.get('Content-Type', 'unknown'),
@@ -151,7 +76,6 @@ def health_check():
     except Exception as e:
         return jsonify({
             "backend_status": "running",
-            "demo_mode": DEMO_MODE,
             "error": str(e),
             "ha_api_url": f"{HOME_ASSISTANT_API}/",
             "supervisor_token_available": bool(SUPERVISOR_TOKEN),
@@ -170,19 +94,6 @@ def execute_template():
     
     if not template:
         return jsonify({"error": "No template provided"}), 400
-    
-    if DEMO_MODE:
-        # Return demo devices for template that looks for zone_1_begin_x entities
-        if 'zone_1_begin_x' in template:
-            demo_devices = [
-                "sensor.mmwave_sensor_living_room",
-                "sensor.mmwave_sensor_bedroom",
-                "sensor.mmwave_sensor_kitchen"
-            ]
-            return jsonify(demo_devices)
-        else:
-            # Return empty result for other templates
-            return jsonify([])
     
     try:
         response = requests.post(
@@ -217,14 +128,6 @@ def get_entity_state(entity_id):
     """
     Endpoint to get the state of a specific entity.
     """
-    if DEMO_MODE:
-        # Return demo data based on entity type
-        demo_entity = generate_demo_entity(entity_id)
-        if demo_entity:
-            return jsonify(demo_entity)
-        else:
-            return jsonify({'error': 'Entity not found in demo mode'}), 404
-    
     response = requests.get(f'{HOME_ASSISTANT_API}/states/{entity_id}', headers=headers)
     if response.status_code == 200:
         return jsonify(response.json())
@@ -241,9 +144,7 @@ def set_value():
         if not entity_id or value is None:
             return jsonify({"error": "Missing entity_id or value"}), 400
         
-        if DEMO_MODE:
-            logging.info(f"Demo mode: Setting {entity_id} to {value}")
-            return jsonify({"message": f"Entity {entity_id} updated successfully (demo mode)."}), 200
+
         
         payload = {
             "entity_id": entity_id,

@@ -7,6 +7,7 @@ The Sense 360 Zone Configurator is a Home Assistant add-on that provides a visua
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+Data integrity: No demo or fake data - application must only work with real Home Assistant integration.
 
 ## System Architecture
 
