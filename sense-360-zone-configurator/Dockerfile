@@ -1,7 +1,7 @@
 ARG BUILD_FROM=ghcr.io/hassio-addons/base:17.2.5
 FROM $BUILD_FROM
 
-ENV LANG C.UTF-8
+ENV LANG=C.UTF-8
 ENV PIP_ROOT_USER_ACTION=ignore
 
 RUN apk add --no-cache ca-certificates && \
@@ -38,3 +38,4 @@ RUN chmod +x /etc/services.d/nginx/run
 
 # Expose the ingress port
 EXPOSE 8099
+
