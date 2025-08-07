@@ -9,10 +9,10 @@ RUN apk add --no-cache ca-certificates && \
 
 RUN apk update && \
     apk add --no-cache nginx python3 py3-pip
-
+    
 RUN apk add py3-requests py3-flask
 
-# Install Python packages
+# Install Python packages 
 RUN apk add --no-cache \
     py3-setuptools \
     py3-wheel \
@@ -32,10 +32,9 @@ COPY backend.py /app/backend.py
 
 # Copy services
 COPY services/ /etc/services.d/
-
 RUN chmod +x /etc/services.d/backend/run
 RUN chmod +x /etc/services.d/nginx/run
 
 # Expose the ingress port
-EXPOSE 8099
+EXPOSE 8099 
 
