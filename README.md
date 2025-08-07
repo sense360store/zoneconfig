@@ -11,12 +11,33 @@ A Home Assistant add-on to visually create zones for mmWave Presence Sensors wit
 - **Target Visualization**: See live targets detected by the mmWave sensor
 - **Home Assistant Integration**: Seamless integration with Home Assistant's API
 
+## Repository Structure
+
+```
+├── .github/workflows/              # GitHub Actions workflow files
+├── sense-360-zone-configurator/    # Main application directory
+│   ├── backend.py                  # Flask backend with HA API integration
+│   ├── main.py                     # Application entry point
+│   ├── config.yaml                 # Home Assistant add-on configuration
+│   ├── Dockerfile                  # Container configuration
+│   ├── nginx.conf                  # Nginx proxy configuration
+│   └── www/                        # Frontend assets
+│       ├── index.html              # Main HTML interface
+│       ├── script.js               # JavaScript application logic
+│       └── styles.css              # CSS styling
+├── README.md                       # This file
+└── repository.yaml                 # Repository metadata
+```
+
 ## Installation
+
+**Important**: This application requires proper Home Assistant credentials to function. It does not include demo data and will only work with a real Home Assistant instance.
 
 1. Add this repository to your Home Assistant add-on store
 2. Install the "Sense 360 Zone Configurator" add-on
-3. Start the add-on
-4. Access the interface through the Home Assistant sidebar
+3. Configure credentials (SUPERVISOR_TOKEN or HA_URL/HA_TOKEN)
+4. Start the add-on
+5. Access the interface through the Home Assistant sidebar
 
 ## Usage
 
@@ -79,3 +100,4 @@ version: "1.2.1"
 slug: "sense-360-zone-configurator"
 ingress: true
 homeassistant_api: true
+# zoneconfig
