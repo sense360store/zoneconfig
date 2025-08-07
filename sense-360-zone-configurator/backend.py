@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.ERROR)  # Set global logging level to ERROR
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)  # Suppress Werkzeug request logs
 
-app = Flask(__name__, static_folder='www', static_url_path='')
+app = Flask(__name__)
 app.config['SECRET_KEY'] = 'everything-presence-configurator-secret'
 sock = Sock(app)
 
@@ -49,11 +49,6 @@ def check_connectivity():
             logging.error(f"Response: {response.text[:200]}")
     except requests.exceptions.RequestException as e:
         logging.error(f"Exception connecting to Home Assistant API: {e}")
-
-@app.route('/')
-def index():
-    """Serve the main HTML file"""
-    return app.send_static_file('index.html')
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
