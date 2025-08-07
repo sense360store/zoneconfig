@@ -325,178 +325,189 @@ def is_mmwave_entity(entity_id):
         "target_1_angle", "target_2_angle", "target_3_angle",
         "target_1_distance", "target_2_distance", "target_3_distance",
         
-        # Configuration  
-        "zone_type", "sensitivity", "custom_mode", "end_delay",
-        "custom_end_delay_presence_sensor_1", "custom_end_delay_presence_sensor_2",
-        "custom_end_delay_presence_sensor_3",
+        # Zone Occupancy Off Delay
+        "zone_1_occupancy_off_delay", "zone_2_occupancy_off_delay", 
+        "zone_3_occupancy_off_delay", "zone_4_occupancy_off_delay",
         
-        # Special Presence and Zone Settings
-        "zone_1_occupancy", "zone_2_occupancy", "zone_3_occupancy", "zone_4_occupancy",
-        "any_target_active", "distance_resolution", "angle_resolution",
+        # Configured Values
+        "max_distance", "installation_angle",
         
-        # Additional Controls
-        "custom_unoccupied_to_occupied_delay", "custom_occupied_to_unoccupied_delay_presence_sensor_1",
-        "custom_occupied_to_unoccupied_delay_presence_sensor_2", "custom_occupied_to_unoccupied_delay_presence_sensor_3",
+        # Occupancy Masks (Exclusion Zones)
+        "occupancy_mask_1_begin_x", "occupancy_mask_1_begin_y", 
+        "occupancy_mask_1_end_x", "occupancy_mask_1_end_y",
+        "occupancy_mask_2_begin_x", "occupancy_mask_2_begin_y",
+        "occupancy_mask_2_end_x", "occupancy_mask_2_end_y",
         
-        # Common LD2410 settings
-        "max_distance_gate", "max_movement_distance_gate", "max_still_distance_gate",
-        "timeout", "light_function", "out_pin_level"
+        # Settings Entities
+        "bluetooth_switch", "inverse_mounting", "aggressive_target_clearing",
+        "off_delay", "zone_1_off_delay", "zone_2_off_delay", "zone_3_off_delay", "zone_4_off_delay",
+        "aggressive_timeout", "illuminance_offset_ui", "illuminance_offset",
+        "esp32_led", "status_led",
     ]
     
-    # Check if entity_id ends with any required suffix
-    for suffix in required_suffixes:
-        if entity_id.endswith(suffix):
-            return True
-    
-    return False
+    return any(entity_id.endswith(suffix) for suffix in required_suffixes)
 
-@sock.route('/websocket')
-def handle_websocket(sock):
-    """WebSocket endpoint that streams Home Assistant state changes"""
-    logging.error(f"WebSocket connection established")
+@sock.route('/ws')
+def websocket_proxy(ws):
+    """WebSocket proxy to Home Assistant WebSocket API"""
+    import websocket
+    import json
+    import threading
+    import queue
     
-    # WebSocket client for HA connection
-    ha_ws_client = None
+    # Create communication queues
+    to_ha_queue = queue.Queue()
+    from_ha_queue = queue.Queue()
+    ha_ws = None
+    proxy_active = True
     
-    def close_ha_websocket():
-        """Helper to safely close HA WebSocket connection"""
-        nonlocal ha_ws_client
-        if ha_ws_client:
-            try:
-                ha_ws_client.close()
-            except:
-                pass
-            ha_ws_client = None
-
-    def forward_ha_websocket():
-        """Forward messages from Home Assistant WebSocket to frontend"""
-        nonlocal ha_ws_client
-        
+    def ha_on_open(ha_ws_instance):
+        supervisor_token = os.environ.get('SUPERVISOR_TOKEN')
+        if supervisor_token:
+            auth_message = {
+                "type": "auth",
+                "access_token": supervisor_token
+            }
+            ha_ws_instance.send(json.dumps(auth_message))
+        else:
+            logging.error("No supervisor token available for WebSocket auth")
+    
+    def ha_on_message(ha_ws_instance, message):
+        # Filter and forward HA messages to frontend
+        global selected_entity_ids  # Must be declared at the beginning of the function
         try:
-            import websocket
+            # Parse message
+            import json
+            data = json.loads(message) if isinstance(message, str) else message
             
-            # Determine WebSocket URL
-            if SUPERVISOR_TOKEN:
-                ha_ws_url = 'ws://supervisor/core/websocket'
-                auth_headers = [f'Authorization: Bearer {SUPERVISOR_TOKEN}']
-            else:
-                ha_ws_url = HA_URL.replace('http://', 'ws://').replace('https://', 'wss://').rstrip('/') + '/websocket'
-                auth_headers = [f'Authorization: Bearer {HA_TOKEN}']
+            # Handle authentication
+            if data.get('type') == 'auth_required':
+                return
+            elif data.get('type') == 'auth_ok':
+                return
+            elif data.get('type') == 'auth_invalid':
+                logging.error("HA WebSocket authentication failed")
+                return
             
-            logging.error(f"HA WebSocket connecting to: {ha_ws_url}")
-            
-            def on_message(ws, message):
-                try:
-                    data = json.loads(message)
-                    
-                    # Only forward state_changed events for entities we care about
-                    if (data.get('type') == 'event' and 
-                        data.get('event', {}).get('event_type') == 'state_changed'):
-                        
-                        entity_id = data.get('event', {}).get('data', {}).get('entity_id')
-                        
-                        # Check if this is an entity the frontend is interested in
-                        global selected_entity_ids
-                        if entity_id and (not selected_entity_ids or entity_id in selected_entity_ids):
-                            # Additional filter: only forward mmWave-related entities
-                            if is_mmwave_entity(entity_id):
-                                sock.send(json.dumps(data))
-                                logging.error(f"Forwarded state change for: {entity_id}")
-                        
-                except json.JSONDecodeError:
-                    logging.error(f"Invalid JSON from HA WebSocket: {message}")
-                except Exception as e:
-                    logging.error(f"Error processing HA WebSocket message: {e}")
-            
-            def on_error(ws, error):
-                logging.error(f"HA WebSocket error: {error}")
-                sock.send(json.dumps({'type': 'error', 'message': str(error)}))
-            
-            def on_close(ws, close_status_code, close_msg):
-                logging.error("HA WebSocket connection closed")
-                sock.send(json.dumps({'type': 'connection_closed', 'message': 'Home Assistant WebSocket closed'}))
-            
-            def on_open(ws):
-                logging.error("HA WebSocket connection opened")
-                # Send auth message
-                auth_msg = {
-                    "type": "auth",
-                    "access_token": SUPERVISOR_TOKEN if SUPERVISOR_TOKEN else HA_TOKEN
-                }
-                ws.send(json.dumps(auth_msg))
+            # Filter state results to only selected device entities
+            if data.get('type') == 'result' and isinstance(data.get('result'), list):
+                # Filter entities to only include the ones selected by frontend
+                filtered_entities = []
+                for entity in data.get('result', []):
+                    entity_id = entity.get('entity_id', '')
+                    if entity_id in selected_entity_ids:
+                        filtered_entities.append(entity)
                 
-                # Subscribe to state changes after successful auth
-                def send_subscribe():
-                    time.sleep(1)  # Wait for auth to complete
-                    subscribe_msg = {
-                        "id": 1,
-                        "type": "subscribe_events",
-                        "event_type": "state_changed"
-                    }
-                    try:
-                        ws.send(json.dumps(subscribe_msg))
-                        logging.error("Subscribed to state_changed events")
-                    except Exception as e:
-                        logging.error(f"Failed to subscribe to events: {e}")
+                if filtered_entities:
+                    # Send filtered result
+                    filtered_data = data.copy()
+                    filtered_data['result'] = filtered_entities
+                    from_ha_queue.put(json.dumps(filtered_data))
+                return
+            
+            # Filter state_changed events to only selected device entities
+            if (data.get('type') == 'event' and 
+                data.get('event', {}).get('event_type') == 'state_changed'):
+                entity_id = data.get('event', {}).get('data', {}).get('entity_id', '')
+                if entity_id in selected_entity_ids:
+                    from_ha_queue.put(message)
+                return
+            
+            # Forward other message types
+            if data.get('type') in ['result']:
+                # Log subscription errors
+                if not data.get('success') and 'id' in data:
+                    error_info = data.get('error', {})
+                    logging.error(f"HA subscription failed for ID {data.get('id')}: {error_info}")
+                from_ha_queue.put(message)
                 
-                # Send subscribe in a separate thread to avoid blocking
-                threading.Thread(target=send_subscribe, daemon=True).start()
-                
-                sock.send(json.dumps({'type': 'connected', 'message': 'Connected to Home Assistant'}))
-            
-            # Create WebSocket client
-            ha_ws_client = websocket.WebSocketApp(
-                ha_ws_url,
-                on_open=on_open,
-                on_message=on_message,
-                on_error=on_error,
-                on_close=on_close,
-                header=auth_headers
-            )
-            
-            # Run WebSocket client
-            ha_ws_client.run_forever()
-            
-        except ImportError:
-            logging.error("websocket-client not available, WebSocket forwarding disabled")
-            sock.send(json.dumps({'type': 'error', 'message': 'WebSocket forwarding not available'}))
         except Exception as e:
-            logging.error(f"HA WebSocket connection failed: {e}")
-            sock.send(json.dumps({'type': 'error', 'message': f'WebSocket connection failed: {str(e)}'}))
+            logging.error(f"Error filtering HA message: {e}")
+            from_ha_queue.put(message)
+    
+    def ha_on_error(ha_ws_instance, error):
+        logging.error(f"HA WebSocket error: {error}")
+    
+    def ha_on_close(ha_ws_instance, close_status_code, close_msg):
+        # Only log non-normal closures as errors
+        if close_status_code and close_status_code != 1000:
+            logging.error(f"HA WebSocket closed unexpectedly: {close_status_code} - {close_msg}")
+        nonlocal proxy_active
+        proxy_active = False
+    
+    # Start HA WebSocket connection
+    ha_ws = websocket.WebSocketApp('ws://supervisor/core/websocket',
+                                   on_open=ha_on_open,
+                                   on_message=ha_on_message,
+                                   on_error=ha_on_error,
+                                   on_close=ha_on_close)
+    
+    # Start HA WebSocket in background thread
+    ha_thread = threading.Thread(target=ha_ws.run_forever)
+    ha_thread.daemon = True
+    ha_thread.start()
+    
+    # Forward messages from frontend to HA
+    def forward_to_ha():
+        while proxy_active and ha_thread.is_alive():
+            try:
+                message = to_ha_queue.get(timeout=1)
+                if ha_ws and ha_ws.sock and ha_ws.sock.connected:
+                    ha_ws.send(message)
+                else:
+                    logging.error("Cannot send to HA - WebSocket not connected")
+                        
+            except queue.Empty:
+                continue
+            except Exception as e:
+                logging.error(f"Error forwarding to HA: {e}")
+                break
+    
+    # Start forwarding thread
+    forward_thread = threading.Thread(target=forward_to_ha)
+    forward_thread.daemon = True
+    forward_thread.start()
     
     try:
-        # Start HA WebSocket forwarding in background thread
-        ha_thread = threading.Thread(target=forward_ha_websocket, daemon=True)
-        ha_thread.start()
-        
-        # Handle messages from frontend
-        while True:
+        # Main proxy loop
+        while proxy_active:
+            # Send queued messages from HA to frontend
             try:
-                message = sock.receive()
-                if message:
-                    data = json.loads(message)
-                    if data.get('type') == 'ping':
-                        sock.send(json.dumps({'type': 'pong'}))
-                    elif data.get('type') == 'set_selected_entities':
-                        # Update selected entities for filtering
-                        entity_ids = data.get('entity_ids', [])
-                        global selected_entity_ids
-                        selected_entity_ids = set(entity_ids)
-                        sock.send(json.dumps({'type': 'entities_updated', 'count': len(selected_entity_ids)}))
-                        logging.error(f"Updated selected entities: {len(selected_entity_ids)} entities")
-                    
-            except json.JSONDecodeError:
-                logging.error(f"Invalid JSON from frontend: {message}")
+                while not from_ha_queue.empty():
+                    ha_message = from_ha_queue.get_nowait()
+                    ws.send(ha_message)
+
+            except queue.Empty:
+                pass
             except Exception as e:
-                logging.error(f"Error handling frontend message: {e}")
+                logging.error(f"Error sending to frontend: {e}")
                 break
-                
+            
+            # Receive messages from frontend
+            try:
+                frontend_message = ws.receive(timeout=0.1)
+                if frontend_message:
+                    to_ha_queue.put(frontend_message)
+
+            except Exception as e:
+                if "timeout" not in str(e).lower():
+                    # Don't log normal WebSocket closures (1000) as errors
+                    if "Connection closed: 1000" not in str(e):
+                        logging.error(f"Error receiving from frontend: {e}")
+                    break
+    
     except Exception as e:
-        logging.error(f"WebSocket error: {e}")
+        logging.error(f"WebSocket proxy error: {e}")
+    
     finally:
-        close_ha_websocket()
-        logging.error("WebSocket connection closed")
+        # Cleanup
+        proxy_active = False
+        if ha_ws:
+            ha_ws.close()
 
 if __name__ == '__main__':
-    check_connectivity()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Start connectivity check
+    threading.Thread(target=check_connectivity).start()
+    
+    # Run Flask server
+    app.run(host='0.0.0.0', port=5000, debug=False)
