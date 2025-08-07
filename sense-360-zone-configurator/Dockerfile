@@ -1,41 +1,40 @@
 ARG BUILD_FROM=ghcr.io/hassio-addons/base:17.2.5
 FROM $BUILD_FROM
 
-# Install required packages
-RUN apk add --no-cache \
-    python3 \
-    python3-dev \
-    py3-pip \
-    nginx \
-    && rm -rf /var/cache/apk/*
+ENV LANG C.UTF-8
+ENV PIP_ROOT_USER_ACTION=ignore
+
+RUN apk add --no-cache ca-certificates && \
+    update-ca-certificates
+
+RUN apk update && \
+    apk add --no-cache nginx python3 py3-pip
+
+RUN apk add py3-requests py3-flask
 
 # Install Python packages
-RUN pip3 install --no-cache-dir \
-    flask \
-    flask-sock \
-    requests \
-    websocket-client
+RUN apk add --no-cache \
+    py3-setuptools \
+    py3-wheel \
+    py3-websocket-client
 
-# Copy configuration files
+# Install Flask-Sock for WebSocket support
+RUN pip3 install --no-cache-dir --break-system-packages flask-sock
+
+# Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
-COPY backend.py /backend.py
-COPY www/ /www/
+
+# Copy your application files
+COPY www /usr/share/nginx/html
+
+# Copy backend script
+COPY backend.py /app/backend.py
+
+# Copy services
 COPY services/ /etc/services.d/
 
-# Make sure services are executable
-RUN chmod +x /etc/services.d/nginx/run
 RUN chmod +x /etc/services.d/backend/run
+RUN chmod +x /etc/services.d/nginx/run
 
-# Create nginx directories
-RUN mkdir -p /var/log/nginx /var/run
-
-# Expose port
+# Expose the ingress port
 EXPOSE 8099
-
-# Labels for Home Assistant
-LABEL \
-    io.hass.name="Sense 360 Zone Configurator" \
-    io.hass.description="Helps you to visually create zones for mmWave Presence Sensors with Sense 360 technology" \
-    io.hass.arch="armhf|aarch64|i386|amd64|armv7" \
-    io.hass.type="addon" \
-    io.hass.version="1.2.1"
