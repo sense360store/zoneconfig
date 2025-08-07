@@ -2,7 +2,7 @@
 
 All notable changes to the Sense 360 Zone Configurator will be documented in this file.
 
-## [1.2.1] - 2024-06-26
+## [0.0.1] - 2024-08-07
 
 ### Changed
 - Rebranded from "Everything Smart Home" to "Sense 360 Zone Configurator"
