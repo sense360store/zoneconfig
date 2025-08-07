@@ -1,28 +1,22 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to the Sense 360 Zone Configurator will be documented in this file.
 
-## [1.2.1] - 2025-08-07
+## [0.0.1] - 2024-08-07
 
-### Added
-- Initial release of Sense 360 Zone Configurator
-- Visual interface for configuring detection zones on mmWave presence sensors
-- Support for up to 4 detection zones per sensor
-- Real-time target visualization
+### Changed
+- Rebranded from "Everything Smart Home" to "Sense 360 Zone Configurator"
+- Updated all UI text, titles, and descriptions to reflect new branding
+- Modified configuration files with new naming convention
+- Updated Docker labels and metadata
+
+### Maintained
+- All existing functionality for visual zone configuration
 - Home Assistant API integration
-- WebSocket support for live updates
-- Bootstrap-based responsive UI
-- Complete Docker containerization
+- WebSocket real-time updates
+- Drag-and-drop zone creation and editing
+- Settings menu for non-zone configuration
+- All service endpoints (switch control, number setting, select options)
 
-### Features
-- Drag-and-drop zone configuration
-- Real-time sensor data display
-- Seamless Home Assistant integration
-- Production-ready deployment with Docker
-- No demo data - requires real Home Assistant credentials
-
-### Technical
-- Flask backend with WebSocket support
-- HTML5 Canvas for zone visualization
-- Nginx reverse proxy configuration
-- Multi-platform Docker builds (amd64, arm64, armv7)
+## Previous Versions
+This changelog starts from the rebrand. For previous version history, refer to the original Everything Smart Home repository.
