@@ -38,3 +38,4 @@ RUN chmod +x /etc/services.d/nginx/run
 
 # Expose the ingress port
 EXPOSE 8099
+
