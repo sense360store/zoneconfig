@@ -1,0 +1,377 @@
+/* Sense 360 Zone Configurator Styles */
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #1a1a1a;
+    color: #e9ecef;
+}
+
+/* Canvas Styling */
+#visualizationCanvas {
+    background-color: #2d3436;
+    border-radius: 8px;
+    cursor: crosshair;
+    transition: all 0.2s ease;
+}
+
+#visualizationCanvas:hover {
+    box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2);
+}
+
+/* Card Enhancements */
+.card {
+    border: 1px solid #495057;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s ease;
+}
+
+.card:hover {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    border-color: #6c757d;
+}
+
+.card-header {
+    background-color: #343a40;
+    border-bottom: 1px solid #495057;
+    border-radius: 12px 12px 0 0 !important;
+}
+
+/* Form Controls */
+.form-control, .form-select {
+    background-color: #343a40;
+    border-color: #495057;
+    color: #e9ecef;
+    transition: all 0.2s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    background-color: #495057;
+    border-color: #007bff;
+    color: #e9ecef;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.form-control::placeholder {
+    color: #6c757d;
+}
+
+/* Buttons */
+.btn {
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn-outline-primary:hover {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.btn-outline-secondary:hover {
+    background-color: #6c757d;
+    border-color: #6c757d;
+}
+
+.btn-outline-warning:hover {
+    background-color: #ffc107;
+    border-color: #ffc107;
+    color: #000;
+}
+
+.btn-outline-danger:hover {
+    background-color: #dc3545;
+    border-color: #dc3545;
+}
+
+/* List Groups */
+.list-group-item {
+    background-color: #343a40;
+    border-color: #495057;
+    transition: all 0.2s ease;
+}
+
+.list-group-item:hover {
+    background-color: #495057;
+}
+
+.list-group-item.active {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+/* Badges */
+.badge {
+    font-size: 0.75rem;
+    padding: 0.5em 0.75em;
+    border-radius: 6px;
+}
+
+/* Connection Status */
+#connectionStatus {
+    position: relative;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+/* Zone List Styling */
+#zoneList .list-group-item {
+    cursor: pointer;
+    border-left: 4px solid transparent;
+    transition: all 0.2s ease;
+}
+
+#zoneList .list-group-item:hover {
+    border-left-color: #007bff;
+    padding-left: 1.25rem;
+}
+
+#zoneList .list-group-item.active {
+    border-left-color: #28a745;
+}
+
+/* Target List */
+#targetList {
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+#targetList::-webkit-scrollbar {
+    width: 6px;
+}
+
+#targetList::-webkit-scrollbar-track {
+    background: #343a40;
+    border-radius: 3px;
+}
+
+#targetList::-webkit-scrollbar-thumb {
+    background: #6c757d;
+    border-radius: 3px;
+}
+
+#targetList::-webkit-scrollbar-thumb:hover {
+    background: #adb5bd;
+}
+
+/* Zone Properties Panel */
+#zoneProperties {
+    background-color: #2d3436;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 1rem;
+    border: 1px solid #495057;
+}
+
+/* Modal Styling */
+.modal-content {
+    border: 1px solid #495057;
+    border-radius: 12px;
+}
+
+.modal-header {
+    border-bottom-color: #495057;
+}
+
+.modal-footer {
+    border-top-color: #495057;
+}
+
+/* Form Switches */
+.form-check-input:checked {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.form-check-input:focus {
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* Settings Cards */
+.card.bg-dark {
+    background-color: #2d3436 !important;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .container-fluid {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+    
+    #visualizationCanvas {
+        width: 100%;
+        height: auto;
+        max-height: 400px;
+    }
+    
+    .btn-group .btn {
+        font-size: 0.875rem;
+        padding: 0.375rem 0.5rem;
+    }
+    
+    .card-body {
+        padding: 0.75rem;
+    }
+}
+
+@media (max-width: 576px) {
+    h1.h3 {
+        font-size: 1.25rem;
+    }
+    
+    .btn-group {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .btn-group .btn {
+        border-radius: 6px !important;
+        margin-bottom: 0.25rem;
+    }
+}
+
+/* Loading Animations */
+.spinner-border {
+    animation: spinner-border 0.75s linear infinite;
+}
+
+@keyframes spinner-border {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Utility Classes */
+.text-shadow {
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.glass-effect {
+    background: rgba(52, 58, 64, 0.8);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hover-lift:hover {
+    transform: translateY(-2px);
+    transition: transform 0.2s ease;
+}
+
+/* Status Icons */
+.fa-wifi.text-success {
+    animation: wifi-pulse 2s infinite;
+}
+
+@keyframes wifi-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+.fa-wifi.text-danger {
+    animation: wifi-disconnect 1s infinite;
+}
+
+@keyframes wifi-disconnect {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0.3; }
+}
+
+/* Grid Background for Canvas */
+.canvas-container {
+    position: relative;
+    background-image: 
+        radial-gradient(circle, #495057 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+/* Zone Color Indicators */
+.zone-color-indicator {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-right: 8px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Settings Page Specific */
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+/* Footer Styling */
+footer {
+    background-color: rgba(33, 37, 41, 0.95);
+    backdrop-filter: blur(10px);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #343a40;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #6c757d;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #adb5bd;
+}
+
+/* Accessibility Improvements */
+.sr-only {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+/* Focus Indicators */
+.btn:focus,
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus {
+    outline: 2px solid #007bff;
+    outline-offset: 2px;
+}
+
+/* Print Styles */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    
+    body {
+        background: white !important;
+        color: black !important;
+    }
+    
+    .card {
+        border: 1px solid #000 !important;
+        break-inside: avoid;
+    }
+}
