@@ -16,10 +16,12 @@ RUN pip3 install --no-cache-dir \
     requests \
     websocket-client
 
+WORKDIR /app
+
 # Copy configuration files
 COPY nginx.conf /etc/nginx/nginx.conf
-COPY backend.py /backend.py
-COPY www/ /www/
+COPY backend.py /app/backend.py
+COPY www/ /app/www/
 COPY services/ /etc/services.d/
 
 # Make sure services are executable
