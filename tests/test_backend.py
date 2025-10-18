@@ -119,3 +119,16 @@ def test_should_forward_state_change(caplog):
 def test_should_not_forward_unselected_state_change():
     should_forward = backend.should_forward_state_change('sensor.other', {'sensor.presence'})
     assert should_forward is False
+
+
+def test_should_forward_mmwave_when_selection_empty(caplog):
+    caplog.set_level(logging.INFO)
+    entity_id = 'sensor.mmwave_zone_1_begin_x'
+    should_forward = backend.should_forward_state_change(entity_id, set())
+    assert should_forward is True
+    assert 'Forwarding mmWave state_changed event' in caplog.text
+
+
+def test_should_not_forward_non_mmwave_when_selection_empty():
+    should_forward = backend.should_forward_state_change('sensor.other', set())
+    assert should_forward is False

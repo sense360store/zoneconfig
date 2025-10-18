@@ -2,6 +2,10 @@
 
 All notable changes to the Sense 360 Zone Configurator will be documented in this file.
 
+## [Unreleased]
+### Fixed
+- Ensured mmWave entity updates continue to stream to the UI even when no entities are selected for live updates.
+
 ## [1.2.2] - 2025-10-18
 ### Changed
 - Added an "Unreleased" section to capture pending work ahead of the next tagged release.

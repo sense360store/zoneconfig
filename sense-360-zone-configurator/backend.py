@@ -90,11 +90,22 @@ def build_auth_message(supervisor_token: str | None, ha_token: str | None) -> di
 
 def should_forward_state_change(entity_id: str, selected_entities: set[str]) -> bool:
     """Determine whether a state change event should be forwarded to the frontend."""
-    if entity_id and entity_id in selected_entities:
-        logger.info('Forwarding state_changed event for %s', entity_id)
+    if not entity_id:
+        logger.debug('Ignoring state_changed event with missing entity_id')
+        return False
+
+    if selected_entities:
+        if entity_id in selected_entities:
+            logger.info('Forwarding state_changed event for %s', entity_id)
+            return True
+        logger.debug('Ignoring state_changed event for %s (not selected)', entity_id)
+        return False
+
+    if is_mmwave_entity(entity_id):
+        logger.info('Forwarding mmWave state_changed event for %s (no selected entities)', entity_id)
         return True
 
-    logger.debug('Ignoring state_changed event for %s', entity_id)
+    logger.debug('Ignoring state_changed event for %s (no selected entities)', entity_id)
     return False
 
 
@@ -489,7 +500,9 @@ def websocket_proxy(ws):
             if isinstance(result_data, list):
                 filtered_entities = [
                     entity for entity in result_data
-                    if entity.get('entity_id', '') in selected_entity_ids
+                    if should_forward_state_change(
+                        entity.get('entity_id', ''), selected_entity_ids
+                    )
                 ]
                 if filtered_entities:
                     filtered_data = dict(data)
