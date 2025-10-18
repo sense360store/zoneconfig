@@ -9,11 +9,15 @@ import threading
 import sys
 import time
 import json
+from urllib.parse import urlparse, urlunparse
 
 # Configure logging
 logging.basicConfig(level=logging.ERROR)  # Set global logging level to ERROR
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)  # Suppress Werkzeug request logs
+
+logger = logging.getLogger(__name__)
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'everything-presence-configurator-secret'
@@ -38,6 +42,53 @@ elif HA_URL and HA_TOKEN:
 else:
     logging.error('No SUPERVISOR_TOKEN found and no HA_URL and HA_TOKEN provided.')
     sys.exit(1)
+
+
+def get_ha_websocket_url(home_assistant_api: str, supervisor_token: str | None) -> str:
+    """Return the Home Assistant WebSocket endpoint."""
+    if supervisor_token:
+        return 'ws://supervisor/core/websocket'
+
+    if not home_assistant_api:
+        raise ValueError('Home Assistant API URL is required when no supervisor token is present.')
+
+    parsed = urlparse(home_assistant_api)
+    scheme = 'wss' if parsed.scheme == 'https' else 'ws'
+    base_path = parsed.path.rstrip('/')
+    if base_path.endswith('/api'):
+        base_path = base_path[:-4]
+    websocket_path = f"{base_path}/api/websocket"
+    return urlunparse((scheme, parsed.netloc, websocket_path or '/api/websocket', '', '', ''))
+
+
+def build_auth_message(supervisor_token: str | None, ha_token: str | None) -> dict | None:
+    """Return the authentication message for the Home Assistant WebSocket."""
+    if supervisor_token:
+        logger.info('Authenticating Home Assistant WebSocket using Supervisor token')
+        return {
+            'type': 'auth',
+            'access_token': supervisor_token
+        }
+
+    if ha_token:
+        logger.info('Authenticating Home Assistant WebSocket using Home Assistant token')
+        return {
+            'type': 'auth',
+            'access_token': ha_token
+        }
+
+    logger.error('No authentication token available for Home Assistant WebSocket connection')
+    return None
+
+
+def should_forward_state_change(entity_id: str, selected_entities: set[str]) -> bool:
+    """Determine whether a state change event should be forwarded to the frontend."""
+    if entity_id and entity_id in selected_entities:
+        logger.info('Forwarding state_changed event for %s', entity_id)
+        return True
+
+    logger.debug('Ignoring state_changed event for %s', entity_id)
+    return False
 
 def check_connectivity():
     """Function to check connectivity with Home Assistant API."""
@@ -362,15 +413,9 @@ def websocket_proxy(ws):
     proxy_active = True
     
     def ha_on_open(ha_ws_instance):
-        supervisor_token = os.environ.get('SUPERVISOR_TOKEN')
-        if supervisor_token:
-            auth_message = {
-                "type": "auth",
-                "access_token": supervisor_token
-            }
+        auth_message = build_auth_message(SUPERVISOR_TOKEN, HA_TOKEN)
+        if auth_message:
             ha_ws_instance.send(json.dumps(auth_message))
-        else:
-            logging.error("No supervisor token available for WebSocket auth")
     
     def ha_on_message(ha_ws_instance, message):
         # Filter and forward HA messages to frontend
@@ -406,10 +451,10 @@ def websocket_proxy(ws):
                 return
             
             # Filter state_changed events to only selected device entities
-            if (data.get('type') == 'event' and 
+            if (data.get('type') == 'event' and
                 data.get('event', {}).get('event_type') == 'state_changed'):
                 entity_id = data.get('event', {}).get('data', {}).get('entity_id', '')
-                if entity_id in selected_entity_ids:
+                if should_forward_state_change(entity_id, selected_entity_ids):
                     from_ha_queue.put(message)
                 return
             
@@ -436,7 +481,9 @@ def websocket_proxy(ws):
         proxy_active = False
     
     # Start HA WebSocket connection
-    ha_ws = websocket.WebSocketApp('ws://supervisor/core/websocket',
+    ha_websocket_url = get_ha_websocket_url(HOME_ASSISTANT_API, SUPERVISOR_TOKEN)
+    logger.info('Connecting to Home Assistant WebSocket at %s', ha_websocket_url)
+    ha_ws = websocket.WebSocketApp(ha_websocket_url,
                                    on_open=ha_on_open,
                                    on_message=ha_on_message,
                                    on_error=ha_on_error,
