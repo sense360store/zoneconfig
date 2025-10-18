@@ -3,6 +3,7 @@
 
 class Sense360Configurator {
     constructor() {
+        this.basePath = this.computeBasePath();
         this.selectedDevice = null;
         this.entities = {};
         this.zones = [];
@@ -16,6 +17,33 @@ class Sense360Configurator {
         this.maxReconnectAttempts = 5;
         
         this.init();
+    }
+
+    computeBasePath() {
+        const path = window.location.pathname || '/';
+        if (path.endsWith('/')) {
+            return path;
+        }
+
+        const lastSlashIndex = path.lastIndexOf('/');
+        if (lastSlashIndex === -1) {
+            return '/';
+        }
+
+        return path.slice(0, lastSlashIndex + 1);
+    }
+
+    resolveUrl(path) {
+        if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(path)) {
+            return path;
+        }
+
+        const normalizedPath = path.startsWith('/') ? path.slice(1) : path;
+        return new URL(normalizedPath, window.location.origin + this.basePath).toString();
+    }
+
+    apiFetch(path, options = {}) {
+        return fetch(this.resolveUrl(path), options);
     }
 
     async init() {
@@ -80,9 +108,9 @@ class Sense360Configurator {
     }
 
     setupWebSocket() {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws`;
-        
+        const wsUrl = new URL('ws', window.location.origin + this.basePath);
+        wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+
         this.ws = new WebSocket(wsUrl);
         
         this.ws.onopen = () => {
@@ -164,7 +192,7 @@ class Sense360Configurator {
                 {{ devices | to_json }}
             `;
             
-            const response = await fetch('/api/template', {
+            const response = await this.apiFetch('/api/template', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ template })
@@ -229,7 +257,7 @@ class Sense360Configurator {
         for (const suffix of entitySuffixes) {
             const entityId = `${this.selectedDevice}_${suffix}`;
             try {
-                const response = await fetch(`/api/entities/${entityId}`);
+                const response = await this.apiFetch(`/api/entities/${entityId}`);
                 if (response.ok) {
                     const entity = await response.json();
                     this.entities[entityId] = entity;
@@ -648,7 +676,7 @@ class Sense360Configurator {
     }
 
     async setEntityValue(entityId, value) {
-        const response = await fetch('/api/services/number/set_value', {
+        const response = await this.apiFetch('/api/services/number/set_value', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ entity_id: entityId, value })
@@ -784,7 +812,7 @@ class Sense360Configurator {
             for (const entitySuffix of settingsEntities) {
                 const entityId = `${this.selectedDevice}_${entitySuffix}`;
                 try {
-                    const response = await fetch(`/api/entities/${entityId}`);
+                    const response = await this.apiFetch(`/api/entities/${entityId}`);
                     if (response.ok) {
                         settings[entitySuffix] = await response.json();
                     }
@@ -877,7 +905,7 @@ class Sense360Configurator {
     async toggleSwitch(entityId, isOn) {
         try {
             const endpoint = isOn ? '/api/services/switch/turn_on' : '/api/services/switch/turn_off';
-            const response = await fetch(endpoint, {
+            const response = await this.apiFetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ entity_id: entityId })
@@ -903,7 +931,7 @@ class Sense360Configurator {
 
     async setSelect(entityId, option) {
         try {
-            const response = await fetch('/api/services/select/select_option', {
+            const response = await this.apiFetch('/api/services/select/select_option', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ entity_id: entityId, option })
