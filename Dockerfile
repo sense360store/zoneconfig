@@ -40,4 +40,4 @@ LABEL \
     io.hass.description="Helps you to visually create zones for mmWave Presence Sensors with Sense 360 technology" \
     io.hass.arch="armhf|aarch64|i386|amd64|armv7" \
     io.hass.type="addon" \
-    io.hass.version="1.2.1"
+    io.hass.version="1.2.2"

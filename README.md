@@ -96,7 +96,7 @@ The application uses WebSocket connections to provide:
 ```yaml
 name: "Sense 360 Zone Configurator"
 description: "Visual zone configuration for mmWave sensors"
-version: "1.2.1"
+version: "1.2.2"
 slug: "sense-360-zone-configurator"
 ingress: true
 homeassistant_api: true
