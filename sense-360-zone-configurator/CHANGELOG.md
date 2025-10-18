@@ -2,13 +2,13 @@
 
 All notable changes to the Sense 360 Zone Configurator will be documented in this file.
 
-## [1.0.1] - 2024-08-07
+## [1.2.1] - 2025-10-18
 
-### Changed
-- New Sense 360 Zone Configurator
+### Added
+- Documented the 1.2.1 release to keep the changelog aligned with the published add-on metadata.
 
-### Maintained
-None
+### Fixed
+- Clarified the requirement to add release notes for each update to prevent missing changelog entries going forward.
 
 ## Previous Versions
-None
+- 1.0.1 - 2024-08-07
