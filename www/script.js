@@ -4,6 +4,8 @@
 class Sense360Configurator {
     constructor() {
         this.selectedDevice = null;
+        this.selectedDeviceDomain = null;
+        this.selectedDeviceSlug = null;
         this.entities = {};
         this.zones = [];
         this.targets = [];
@@ -142,7 +144,7 @@ class Sense360Configurator {
 
     isRelevantEntity(entityId) {
         if (!entityId || !this.selectedDevice) return false;
-        
+
         const relevantSuffixes = [
             'target_1_x', 'target_1_y', 'target_1_active',
             'target_2_x', 'target_2_y', 'target_2_active',
@@ -152,9 +154,8 @@ class Sense360Configurator {
             'zone_3_begin_x', 'zone_3_begin_y', 'zone_3_end_x', 'zone_3_end_y',
             'zone_4_begin_x', 'zone_4_begin_y', 'zone_4_end_x', 'zone_4_end_y'
         ];
-        
-        return relevantSuffixes.some(suffix => entityId.endsWith(suffix)) &&
-               entityId.startsWith(this.selectedDevice);
+
+        return relevantSuffixes.some(suffix => entityId === this.getDefaultEntityId(suffix));
     }
 
     async loadDevices() {
@@ -198,6 +199,8 @@ class Sense360Configurator {
     async selectDevice(deviceId) {
         if (!deviceId) {
             this.selectedDevice = null;
+            this.selectedDeviceDomain = null;
+            this.selectedDeviceSlug = null;
             this.entities = {};
             this.zones = [];
             this.targets = [];
@@ -205,11 +208,26 @@ class Sense360Configurator {
             return;
         }
 
+        const [domain, slug] = deviceId.split('.');
         this.selectedDevice = deviceId;
+        this.selectedDeviceDomain = domain;
+        this.selectedDeviceSlug = slug;
         await this.loadDeviceEntities();
         this.loadZonesFromEntities();
         this.updateVisualization();
         this.updateZoneList();
+    }
+
+    getEntityId(domain, suffix = '') {
+        if (!this.selectedDeviceSlug) return null;
+        return suffix
+            ? `${domain}.${this.selectedDeviceSlug}_${suffix}`
+            : `${domain}.${this.selectedDeviceSlug}`;
+    }
+
+    getDefaultEntityId(suffix = '') {
+        if (!this.selectedDeviceDomain) return null;
+        return this.getEntityId(this.selectedDeviceDomain, suffix);
     }
 
     async loadDeviceEntities() {
@@ -223,11 +241,13 @@ class Sense360Configurator {
             'target_1_x', 'target_1_y', 'target_1_active',
             'target_2_x', 'target_2_y', 'target_2_active',
             'target_3_x', 'target_3_y', 'target_3_active',
-            'zone_1_off_delay', 'zone_2_off_delay', 'zone_3_off_delay', 'zone_4_off_delay'
+            'zone_1_off_delay', 'zone_2_off_delay', 'zone_3_off_delay', 'zone_4_off_delay',
+            'max_distance'
         ];
 
         for (const suffix of entitySuffixes) {
-            const entityId = `${this.selectedDevice}_${suffix}`;
+            const entityId = this.getDefaultEntityId(suffix);
+            if (!entityId) continue;
             try {
                 const response = await fetch(`/api/entities/${entityId}`);
                 if (response.ok) {
@@ -244,11 +264,11 @@ class Sense360Configurator {
         this.zones = [];
         
         for (let i = 1; i <= 4; i++) {
-            const beginX = this.getEntityValue(`${this.selectedDevice}_zone_${i}_begin_x`);
-            const beginY = this.getEntityValue(`${this.selectedDevice}_zone_${i}_begin_y`);
-            const endX = this.getEntityValue(`${this.selectedDevice}_zone_${i}_end_x`);
-            const endY = this.getEntityValue(`${this.selectedDevice}_zone_${i}_end_y`);
-            const offDelay = this.getEntityValue(`${this.selectedDevice}_zone_${i}_off_delay`) || 5;
+            const beginX = this.getEntityValue(this.getDefaultEntityId(`zone_${i}_begin_x`));
+            const beginY = this.getEntityValue(this.getDefaultEntityId(`zone_${i}_begin_y`));
+            const endX = this.getEntityValue(this.getDefaultEntityId(`zone_${i}_end_x`));
+            const endY = this.getEntityValue(this.getDefaultEntityId(`zone_${i}_end_y`));
+            const offDelay = this.getEntityValue(this.getDefaultEntityId(`zone_${i}_off_delay`)) || 5;
 
             if (beginX !== null && beginY !== null && endX !== null && endY !== null) {
                 this.zones.push({
@@ -321,7 +341,7 @@ class Sense360Configurator {
     drawSensorRange() {
         const centerX = this.canvas.width / 2;
         const centerY = this.canvas.height - 50;
-        const maxDistance = this.getEntityValue(`${this.selectedDevice}_max_distance`) || 6000;
+        const maxDistance = this.getEntityValue(this.getDefaultEntityId('max_distance')) || 6000;
         const scale = Math.min(this.canvas.width, this.canvas.height) / (maxDistance * 2);
         const radius = maxDistance * scale;
 
@@ -442,9 +462,9 @@ class Sense360Configurator {
         this.targets = [];
         
         for (let i = 1; i <= 3; i++) {
-            const active = this.getEntityValue(`${this.selectedDevice}_target_${i}_active`);
-            const x = this.getEntityValue(`${this.selectedDevice}_target_${i}_x`);
-            const y = this.getEntityValue(`${this.selectedDevice}_target_${i}_y`);
+            const active = this.getEntityValue(this.getDefaultEntityId(`target_${i}_active`));
+            const x = this.getEntityValue(this.getDefaultEntityId(`target_${i}_x`));
+            const y = this.getEntityValue(this.getDefaultEntityId(`target_${i}_y`));
 
             if (active && x !== null && y !== null) {
                 this.targets.push({
@@ -629,8 +649,9 @@ class Sense360Configurator {
     async saveZoneToDevice(zone) {
         if (!this.selectedDevice) return;
 
-        const entityPrefix = `${this.selectedDevice}_zone_${zone.id}`;
-        
+        const entityPrefix = this.getDefaultEntityId(`zone_${zone.id}`);
+        if (!entityPrefix) return;
+
         try {
             await Promise.all([
                 this.setEntityValue(`${entityPrefix}_begin_x`, zone.x1),
@@ -692,8 +713,9 @@ class Sense360Configurator {
     async clearZoneFromDevice(zoneId) {
         if (!this.selectedDevice) return;
 
-        const entityPrefix = `${this.selectedDevice}_zone_${zoneId}`;
-        
+        const entityPrefix = this.getDefaultEntityId(`zone_${zoneId}`);
+        if (!entityPrefix) return;
+
         try {
             await Promise.all([
                 this.setEntityValue(`${entityPrefix}_begin_x`, 0),
@@ -774,19 +796,25 @@ class Sense360Configurator {
 
     async loadSettings(container) {
         try {
-            const settingsEntities = [
-                'bluetooth_switch', 'inverse_mounting', 'aggressive_target_clearing',
-                'off_delay', 'aggressive_timeout', 'illuminance_offset',
-                'esp32_led', 'status_led'
+            const settingEntities = [
+                { key: 'bluetooth_switch', domain: 'switch' },
+                { key: 'inverse_mounting', domain: 'switch' },
+                { key: 'aggressive_target_clearing', domain: 'switch' },
+                { key: 'off_delay', domain: 'number' },
+                { key: 'aggressive_timeout', domain: 'number' },
+                { key: 'illuminance_offset', domain: 'number' },
+                { key: 'esp32_led', domain: 'switch' },
+                { key: 'status_led', domain: 'switch' }
             ];
 
             const settings = {};
-            for (const entitySuffix of settingsEntities) {
-                const entityId = `${this.selectedDevice}_${entitySuffix}`;
+            for (const { key, domain } of settingEntities) {
+                const entityId = this.getEntityId(domain, key);
+                if (!entityId) continue;
                 try {
                     const response = await fetch(`/api/entities/${entityId}`);
                     if (response.ok) {
-                        settings[entitySuffix] = await response.json();
+                        settings[key] = await response.json();
                     }
                 } catch (error) {
                     console.warn(`Could not load ${entityId}:`, error);
