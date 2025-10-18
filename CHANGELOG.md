@@ -2,7 +2,7 @@
 
 All notable changes to the Sense 360 Zone Configurator will be documented in this file.
 
-## [Unreleased]
+## [1.2.2] - 2025-10-18
 ### Changed
 - Added an "Unreleased" section to capture pending work ahead of the next tagged release.
 
