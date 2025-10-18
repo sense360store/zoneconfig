@@ -177,12 +177,26 @@ def execute_template():
         return jsonify({"error": "Exception occurred while executing template", "details": str(exc)}), 500
 
 
+missing_entity_warnings: set[str] = set()
+
+
 @app.route('/api/entities/<entity_id>', methods=['GET'])
 def get_entity_state(entity_id):
     """Endpoint to get the state of a specific entity."""
+    global missing_entity_warnings
+
     response = requests.get(f'{HOME_ASSISTANT_API}/states/{entity_id}', headers=headers)
     if response.status_code == 200:
+        if entity_id in missing_entity_warnings:
+            logger.info('Entity %s is now available', entity_id)
+            missing_entity_warnings.discard(entity_id)
         return jsonify(response.json())
+
+    if response.status_code == 404:
+        if entity_id not in missing_entity_warnings:
+            logger.info('Home Assistant reports %s is unavailable (404); continuing without it', entity_id)
+            missing_entity_warnings.add(entity_id)
+        return jsonify({'error': 'Entity not found'}), 404
 
     logger.warning('Failed to fetch entity %s: status %s', entity_id, response.status_code)
     return jsonify({'error': 'Unauthorized or entity not found'}), response.status_code
