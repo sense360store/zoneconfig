@@ -242,32 +242,48 @@ class Sense360Configurator {
 
     loadZonesFromEntities() {
         this.zones = [];
-        
+
         for (let i = 1; i <= 4; i++) {
-            const beginX = this.getEntityValue(`${this.selectedDevice}_zone_${i}_begin_x`);
-            const beginY = this.getEntityValue(`${this.selectedDevice}_zone_${i}_begin_y`);
-            const endX = this.getEntityValue(`${this.selectedDevice}_zone_${i}_end_x`);
-            const endY = this.getEntityValue(`${this.selectedDevice}_zone_${i}_end_y`);
-            const offDelay = this.getEntityValue(`${this.selectedDevice}_zone_${i}_off_delay`) || 5;
+            const beginX = this.getEntityNumber(`${this.selectedDevice}_zone_${i}_begin_x`);
+            const beginY = this.getEntityNumber(`${this.selectedDevice}_zone_${i}_begin_y`);
+            const endX = this.getEntityNumber(`${this.selectedDevice}_zone_${i}_end_x`);
+            const endY = this.getEntityNumber(`${this.selectedDevice}_zone_${i}_end_y`);
+            const offDelayValue = this.getEntityNumber(`${this.selectedDevice}_zone_${i}_off_delay`);
 
             if (beginX !== null && beginY !== null && endX !== null && endY !== null) {
                 this.zones.push({
                     id: i,
                     name: `Zone ${i}`,
-                    x1: parseInt(beginX),
-                    y1: parseInt(beginY),
-                    x2: parseInt(endX),
-                    y2: parseInt(endY),
-                    offDelay: parseInt(offDelay),
+                    x1: Math.trunc(beginX),
+                    y1: Math.trunc(beginY),
+                    x2: Math.trunc(endX),
+                    y2: Math.trunc(endY),
+                    offDelay: offDelayValue !== null ? Math.trunc(offDelayValue) : 5,
                     color: this.getZoneColor(i)
                 });
             }
         }
     }
 
-    getEntityValue(entityId) {
+    getEntityNumber(entityId) {
         const entity = this.entities[entityId];
-        return entity ? parseFloat(entity.state) : null;
+        if (!entity) return null;
+
+        const value = parseFloat(entity.state);
+        return Number.isNaN(value) ? null : value;
+    }
+
+    getEntityState(entityId) {
+        const entity = this.entities[entityId];
+        return entity ? entity.state : null;
+    }
+
+    isEntityActive(entityId) {
+        const state = this.getEntityState(entityId);
+        if (state === null || state === undefined) return false;
+
+        const normalized = state.toString().trim().toLowerCase();
+        return normalized === 'on' || normalized === 'true';
     }
 
     getZoneColor(zoneId) {
@@ -321,7 +337,7 @@ class Sense360Configurator {
     drawSensorRange() {
         const centerX = this.canvas.width / 2;
         const centerY = this.canvas.height - 50;
-        const maxDistance = this.getEntityValue(`${this.selectedDevice}_max_distance`) || 6000;
+        const maxDistance = this.getEntityNumber(`${this.selectedDevice}_max_distance`) || 6000;
         const scale = Math.min(this.canvas.width, this.canvas.height) / (maxDistance * 2);
         const radius = maxDistance * scale;
 
@@ -440,17 +456,22 @@ class Sense360Configurator {
 
     updateTargets() {
         this.targets = [];
-        
-        for (let i = 1; i <= 3; i++) {
-            const active = this.getEntityValue(`${this.selectedDevice}_target_${i}_active`);
-            const x = this.getEntityValue(`${this.selectedDevice}_target_${i}_x`);
-            const y = this.getEntityValue(`${this.selectedDevice}_target_${i}_y`);
 
-            if (active && x !== null && y !== null) {
+        if (!this.selectedDevice) {
+            this.updateTargetList();
+            return;
+        }
+
+        for (let i = 1; i <= 3; i++) {
+            const isActive = this.isEntityActive(`${this.selectedDevice}_target_${i}_active`);
+            const x = this.getEntityNumber(`${this.selectedDevice}_target_${i}_x`);
+            const y = this.getEntityNumber(`${this.selectedDevice}_target_${i}_y`);
+
+            if (isActive && x !== null && y !== null) {
                 this.targets.push({
                     id: i,
-                    x: parseFloat(x),
-                    y: parseFloat(y),
+                    x: x,
+                    y: y,
                     active: true
                 });
             }
