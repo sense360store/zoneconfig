@@ -5,7 +5,10 @@ class Sense360Configurator {
     constructor() {
         this.basePath = this.computeBasePath();
         this.selectedDevice = null;
+        this.selectedDeviceDomain = null;
+        this.selectedDeviceSlug = null;
         this.entities = {};
+        this.entityIdsBySuffix = {};
         this.zones = [];
         this.targets = [];
         this.canvas = null;
@@ -159,8 +162,12 @@ class Sense360Configurator {
         if (data.type === 'event' && data.event?.event_type === 'state_changed') {
             const entityId = data.event.data.entity_id;
             const newState = data.event.data.new_state;
-            
+
             if (newState && this.isRelevantEntity(entityId)) {
+                const suffix = this.getSuffixFromEntityId(entityId);
+                if (suffix) {
+                    this.entityIdsBySuffix[suffix] = entityId;
+                }
                 this.entities[entityId] = newState;
                 this.updateVisualization();
                 this.updateLastUpdateTime();
@@ -169,8 +176,8 @@ class Sense360Configurator {
     }
 
     isRelevantEntity(entityId) {
-        if (!entityId || !this.selectedDevice) return false;
-        
+        if (!entityId || !this.selectedDeviceSlug) return false;
+
         const relevantSuffixes = [
             'target_1_x', 'target_1_y', 'target_1_active',
             'target_2_x', 'target_2_y', 'target_2_active',
@@ -178,11 +185,16 @@ class Sense360Configurator {
             'zone_1_begin_x', 'zone_1_begin_y', 'zone_1_end_x', 'zone_1_end_y',
             'zone_2_begin_x', 'zone_2_begin_y', 'zone_2_end_x', 'zone_2_end_y',
             'zone_3_begin_x', 'zone_3_begin_y', 'zone_3_end_x', 'zone_3_end_y',
-            'zone_4_begin_x', 'zone_4_begin_y', 'zone_4_end_x', 'zone_4_end_y'
+            'zone_4_begin_x', 'zone_4_begin_y', 'zone_4_end_x', 'zone_4_end_y',
+            'zone_1_off_delay', 'zone_2_off_delay', 'zone_3_off_delay', 'zone_4_off_delay',
+            'max_distance',
+            'bluetooth_switch', 'inverse_mounting', 'aggressive_target_clearing',
+            'off_delay', 'aggressive_timeout', 'illuminance_offset',
+            'esp32_led', 'status_led'
         ];
-        
-        return relevantSuffixes.some(suffix => entityId.endsWith(suffix)) &&
-               entityId.startsWith(this.selectedDevice);
+
+        const suffix = this.getSuffixFromEntityId(entityId);
+        return suffix ? relevantSuffixes.includes(suffix) : false;
     }
 
     async loadDevices() {
@@ -226,45 +238,134 @@ class Sense360Configurator {
     async selectDevice(deviceId) {
         if (!deviceId) {
             this.selectedDevice = null;
+            this.selectedDeviceDomain = null;
+            this.selectedDeviceSlug = null;
             this.entities = {};
+            this.entityIdsBySuffix = {};
             this.zones = [];
             this.targets = [];
             this.updateVisualization();
             return;
         }
 
+        const [domain, slug] = deviceId.split('.');
         this.selectedDevice = deviceId;
+        this.selectedDeviceDomain = domain;
+        this.selectedDeviceSlug = slug;
+        this.entities = {};
+        this.entityIdsBySuffix = {};
         await this.loadDeviceEntities();
         this.loadZonesFromEntities();
         this.updateVisualization();
         this.updateZoneList();
     }
 
-    async loadDeviceEntities() {
-        if (!this.selectedDevice) return;
+    buildEntityId(domain, suffix) {
+        if (!this.selectedDeviceSlug || !domain || !suffix) return null;
+        return `${domain}.${this.selectedDeviceSlug}_${suffix}`;
+    }
 
-        const entitySuffixes = [
-            'zone_1_begin_x', 'zone_1_begin_y', 'zone_1_end_x', 'zone_1_end_y',
-            'zone_2_begin_x', 'zone_2_begin_y', 'zone_2_end_x', 'zone_2_end_y',
-            'zone_3_begin_x', 'zone_3_begin_y', 'zone_3_end_x', 'zone_3_end_y',
-            'zone_4_begin_x', 'zone_4_begin_y', 'zone_4_end_x', 'zone_4_end_y',
-            'target_1_x', 'target_1_y', 'target_1_active',
-            'target_2_x', 'target_2_y', 'target_2_active',
-            'target_3_x', 'target_3_y', 'target_3_active',
-            'zone_1_off_delay', 'zone_2_off_delay', 'zone_3_off_delay', 'zone_4_off_delay'
-        ];
+    getSuffixFromEntityId(entityId) {
+        if (!entityId || !this.selectedDeviceSlug) return null;
 
-        for (const suffix of entitySuffixes) {
-            const entityId = `${this.selectedDevice}_${suffix}`;
+        const parts = entityId.split('.');
+        if (parts.length !== 2) return null;
+
+        const slugPart = parts[1];
+        const prefix = `${this.selectedDeviceSlug}_`;
+        if (!slugPart.startsWith(prefix)) return null;
+
+        return slugPart.slice(prefix.length);
+    }
+
+    getEntityIdFromSuffix(domains, suffix) {
+        if (!suffix) return null;
+
+        const domainList = Array.isArray(domains) ? domains : [domains];
+
+        if (this.entityIdsBySuffix[suffix]) {
+            return this.entityIdsBySuffix[suffix];
+        }
+
+        for (const domain of domainList) {
+            const entityId = this.buildEntityId(domain, suffix);
+            if (entityId && this.entities[entityId]) {
+                this.entityIdsBySuffix[suffix] = entityId;
+                return entityId;
+            }
+        }
+
+        return null;
+    }
+
+    async fetchEntityByDomains(domains, suffix) {
+        if (!this.selectedDeviceSlug || !suffix) return null;
+
+        const domainList = Array.isArray(domains) ? domains : [domains];
+
+        for (const domain of domainList) {
+            const entityId = this.buildEntityId(domain, suffix);
+            if (!entityId) continue;
+
             try {
                 const response = await this.apiFetch(`/api/entities/${entityId}`);
                 if (response.ok) {
                     const entity = await response.json();
                     this.entities[entityId] = entity;
+                    this.entityIdsBySuffix[suffix] = entityId;
+                    return entityId;
                 }
+
+                if (response.status === 404) {
+                    continue;
+                }
+                console.warn(`Failed to load entity ${entityId}: ${response.status} ${response.statusText}`);
             } catch (error) {
-                console.error(`Error loading entity ${entityId}:`, error);
+                console.warn(`Error loading entity ${entityId}:`, error);
             }
+        }
+
+        return null;
+    }
+
+    async loadDeviceEntities() {
+        if (!this.selectedDevice) return;
+
+        const entityConfigs = [
+            { suffix: 'zone_1_begin_x', domains: ['number'] },
+            { suffix: 'zone_1_begin_y', domains: ['number'] },
+            { suffix: 'zone_1_end_x', domains: ['number'] },
+            { suffix: 'zone_1_end_y', domains: ['number'] },
+            { suffix: 'zone_2_begin_x', domains: ['number'] },
+            { suffix: 'zone_2_begin_y', domains: ['number'] },
+            { suffix: 'zone_2_end_x', domains: ['number'] },
+            { suffix: 'zone_2_end_y', domains: ['number'] },
+            { suffix: 'zone_3_begin_x', domains: ['number'] },
+            { suffix: 'zone_3_begin_y', domains: ['number'] },
+            { suffix: 'zone_3_end_x', domains: ['number'] },
+            { suffix: 'zone_3_end_y', domains: ['number'] },
+            { suffix: 'zone_4_begin_x', domains: ['number'] },
+            { suffix: 'zone_4_begin_y', domains: ['number'] },
+            { suffix: 'zone_4_end_x', domains: ['number'] },
+            { suffix: 'zone_4_end_y', domains: ['number'] },
+            { suffix: 'zone_1_off_delay', domains: ['number'] },
+            { suffix: 'zone_2_off_delay', domains: ['number'] },
+            { suffix: 'zone_3_off_delay', domains: ['number'] },
+            { suffix: 'zone_4_off_delay', domains: ['number'] },
+            { suffix: 'target_1_x', domains: ['sensor'] },
+            { suffix: 'target_1_y', domains: ['sensor'] },
+            { suffix: 'target_1_active', domains: ['binary_sensor', 'switch'] },
+            { suffix: 'target_2_x', domains: ['sensor'] },
+            { suffix: 'target_2_y', domains: ['sensor'] },
+            { suffix: 'target_2_active', domains: ['binary_sensor', 'switch'] },
+            { suffix: 'target_3_x', domains: ['sensor'] },
+            { suffix: 'target_3_y', domains: ['sensor'] },
+            { suffix: 'target_3_active', domains: ['binary_sensor', 'switch'] },
+            { suffix: 'max_distance', domains: ['number', 'sensor'] }
+        ];
+
+        for (const { suffix, domains } of entityConfigs) {
+            await this.fetchEntityByDomains(domains, suffix);
         }
     }
 
@@ -272,11 +373,11 @@ class Sense360Configurator {
         this.zones = [];
 
         for (let i = 1; i <= 4; i++) {
-            const beginX = this.getEntityNumber(`${this.selectedDevice}_zone_${i}_begin_x`);
-            const beginY = this.getEntityNumber(`${this.selectedDevice}_zone_${i}_begin_y`);
-            const endX = this.getEntityNumber(`${this.selectedDevice}_zone_${i}_end_x`);
-            const endY = this.getEntityNumber(`${this.selectedDevice}_zone_${i}_end_y`);
-            const offDelayValue = this.getEntityNumber(`${this.selectedDevice}_zone_${i}_off_delay`);
+            const beginX = this.getEntityNumber(this.getEntityIdFromSuffix('number', `zone_${i}_begin_x`));
+            const beginY = this.getEntityNumber(this.getEntityIdFromSuffix('number', `zone_${i}_begin_y`));
+            const endX = this.getEntityNumber(this.getEntityIdFromSuffix('number', `zone_${i}_end_x`));
+            const endY = this.getEntityNumber(this.getEntityIdFromSuffix('number', `zone_${i}_end_y`));
+            const offDelayValue = this.getEntityNumber(this.getEntityIdFromSuffix('number', `zone_${i}_off_delay`));
 
             if (beginX !== null && beginY !== null && endX !== null && endY !== null) {
                 this.zones.push({
@@ -294,6 +395,8 @@ class Sense360Configurator {
     }
 
     getEntityNumber(entityId) {
+        if (!entityId) return null;
+
         const entity = this.entities[entityId];
         if (!entity) return null;
 
@@ -302,6 +405,8 @@ class Sense360Configurator {
     }
 
     getEntityState(entityId) {
+        if (!entityId) return null;
+
         const entity = this.entities[entityId];
         return entity ? entity.state : null;
     }
@@ -365,7 +470,8 @@ class Sense360Configurator {
     drawSensorRange() {
         const centerX = this.canvas.width / 2;
         const centerY = this.canvas.height - 50;
-        const maxDistance = this.getEntityNumber(`${this.selectedDevice}_max_distance`) || 6000;
+        const maxDistanceEntityId = this.getEntityIdFromSuffix(['number', 'sensor'], 'max_distance');
+        const maxDistance = this.getEntityNumber(maxDistanceEntityId) || 6000;
         const scale = Math.min(this.canvas.width, this.canvas.height) / (maxDistance * 2);
         const radius = maxDistance * scale;
 
@@ -491,9 +597,13 @@ class Sense360Configurator {
         }
 
         for (let i = 1; i <= 3; i++) {
-            const isActive = this.isEntityActive(`${this.selectedDevice}_target_${i}_active`);
-            const x = this.getEntityNumber(`${this.selectedDevice}_target_${i}_x`);
-            const y = this.getEntityNumber(`${this.selectedDevice}_target_${i}_y`);
+            const activeEntityId = this.getEntityIdFromSuffix(['binary_sensor', 'switch'], `target_${i}_active`);
+            const xEntityId = this.getEntityIdFromSuffix('sensor', `target_${i}_x`);
+            const yEntityId = this.getEntityIdFromSuffix('sensor', `target_${i}_y`);
+
+            const isActive = this.isEntityActive(activeEntityId);
+            const x = this.getEntityNumber(xEntityId);
+            const y = this.getEntityNumber(yEntityId);
 
             if (isActive && x !== null && y !== null) {
                 this.targets.push({
@@ -678,17 +788,15 @@ class Sense360Configurator {
     async saveZoneToDevice(zone) {
         if (!this.selectedDevice) return;
 
-        const entityPrefix = `${this.selectedDevice}_zone_${zone.id}`;
-        
         try {
             await Promise.all([
-                this.setEntityValue(`${entityPrefix}_begin_x`, zone.x1),
-                this.setEntityValue(`${entityPrefix}_begin_y`, zone.y1),
-                this.setEntityValue(`${entityPrefix}_end_x`, zone.x2),
-                this.setEntityValue(`${entityPrefix}_end_y`, zone.y2),
-                this.setEntityValue(`${entityPrefix}_off_delay`, zone.offDelay)
+                this.setEntityValue(this.buildEntityId('number', `zone_${zone.id}_begin_x`), zone.x1),
+                this.setEntityValue(this.buildEntityId('number', `zone_${zone.id}_begin_y`), zone.y1),
+                this.setEntityValue(this.buildEntityId('number', `zone_${zone.id}_end_x`), zone.x2),
+                this.setEntityValue(this.buildEntityId('number', `zone_${zone.id}_end_y`), zone.y2),
+                this.setEntityValue(this.buildEntityId('number', `zone_${zone.id}_off_delay`), zone.offDelay)
             ]);
-            
+
             this.showSuccess(`Zone ${zone.id} saved successfully`);
         } catch (error) {
             console.error('Error saving zone:', error);
@@ -697,6 +805,10 @@ class Sense360Configurator {
     }
 
     async setEntityValue(entityId, value) {
+        if (!entityId) {
+            throw new Error('Entity ID not available for update');
+        }
+
         const response = await this.apiFetch('/api/services/number/set_value', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -741,14 +853,12 @@ class Sense360Configurator {
     async clearZoneFromDevice(zoneId) {
         if (!this.selectedDevice) return;
 
-        const entityPrefix = `${this.selectedDevice}_zone_${zoneId}`;
-        
         try {
             await Promise.all([
-                this.setEntityValue(`${entityPrefix}_begin_x`, 0),
-                this.setEntityValue(`${entityPrefix}_begin_y`, 0),
-                this.setEntityValue(`${entityPrefix}_end_x`, 0),
-                this.setEntityValue(`${entityPrefix}_end_y`, 0)
+                this.setEntityValue(this.buildEntityId('number', `zone_${zoneId}_begin_x`), 0),
+                this.setEntityValue(this.buildEntityId('number', `zone_${zoneId}_begin_y`), 0),
+                this.setEntityValue(this.buildEntityId('number', `zone_${zoneId}_end_x`), 0),
+                this.setEntityValue(this.buildEntityId('number', `zone_${zoneId}_end_y`), 0)
             ]);
         } catch (error) {
             console.error('Error clearing zone:', error);
@@ -824,21 +934,24 @@ class Sense360Configurator {
     async loadSettings(container) {
         try {
             const settingsEntities = [
-                'bluetooth_switch', 'inverse_mounting', 'aggressive_target_clearing',
-                'off_delay', 'aggressive_timeout', 'illuminance_offset',
-                'esp32_led', 'status_led'
+                { key: 'bluetooth_switch', domains: ['switch'] },
+                { key: 'inverse_mounting', domains: ['select', 'switch'] },
+                { key: 'aggressive_target_clearing', domains: ['switch'] },
+                { key: 'off_delay', domains: ['number'] },
+                { key: 'aggressive_timeout', domains: ['number'] },
+                { key: 'illuminance_offset', domains: ['number'] },
+                { key: 'esp32_led', domains: ['switch'] },
+                { key: 'status_led', domains: ['switch'] }
             ];
 
             const settings = {};
-            for (const entitySuffix of settingsEntities) {
-                const entityId = `${this.selectedDevice}_${entitySuffix}`;
-                try {
-                    const response = await this.apiFetch(`/api/entities/${entityId}`);
-                    if (response.ok) {
-                        settings[entitySuffix] = await response.json();
-                    }
-                } catch (error) {
-                    console.warn(`Could not load ${entityId}:`, error);
+            for (const { key, domains } of settingsEntities) {
+                let entityId = this.getEntityIdFromSuffix(domains, key);
+                if (!entityId) {
+                    entityId = await this.fetchEntityByDomains(domains, key);
+                }
+                if (entityId) {
+                    settings[key] = this.entities[entityId];
                 }
             }
 
